@@ -12,7 +12,7 @@
 # about verification http quirks.
 import unittest2 as unittest
 import uuid
-import urlparse
+from urllib.parse import urlparse
 import httplib_fork as httplib
 import os
 

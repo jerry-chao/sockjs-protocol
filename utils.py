@@ -1,15 +1,15 @@
-import urlparse
+from urllib.parse import urlparse
 import httplib_fork as httplib
 from ws4py.client.threadedclient import WebSocketClient
-import Queue
+import queue
 import socket
 import re
 
 class HttpResponse:
     def __init__(self, method, url,
-                 headers={}, body=None, async=False, load=True):
+                 headers={}, body=None, isAsync=False, load=True):
         headers = headers.copy()
-        u = urlparse.urlparse(url)
+        u = urlparse(url)
         kwargs = {'timeout': 1.0}
         if u.scheme == 'http':
             conn = httplib.HTTPConnection(u.netloc, **kwargs)
@@ -21,7 +21,7 @@ class HttpResponse:
         path = u.path + ('?' + u.query if u.query else '')
         self.conn = conn
         if not body:
-            if method is 'POST':
+            if method == 'POST':
                 # The spec says: "Applications SHOULD use this field
                 # to indicate the transfer-length of the message-body,
                 # unless this is prohibited by the rules in section
@@ -36,7 +36,7 @@ class HttpResponse:
             conn.request(method, path, headers=headers, body=body)
 
         if load:
-            if not async:
+            if not isAsync:
                 self._load()
             else:
                 self._async_load()
@@ -74,14 +74,14 @@ class HttpResponse:
             return None
 
 def old_POST_async(url, **kwargs):
-    return HttpResponse('POST', url, async=True, **kwargs)
+    return HttpResponse('POST', url, isAsync=True, **kwargs)
 
 
 class WebSocket8Client(object):
     class ConnectionClosedException(Exception): pass
 
     def __init__(self, url):
-        queue = Queue.Queue()
+        queue = queue.Queue()
         self.queue = queue
         class IntWebSocketClient(WebSocketClient):
             def received_message(self, m):
@@ -123,10 +123,11 @@ class WebSocket8Client(object):
 def recvline(s):
     b = []
     c = None
-    while c != '\n':
+    while c != b'\n':
+        print('recvline:', c)
         c = s.recv(1)
         b.append( c )
-    return ''.join(b)
+    return b''.join(b).decode('utf-8')
 
 
 class CaseInsensitiveDict(object):
@@ -175,14 +176,14 @@ class Response(object):
 
 class RawHttpConnection(object):
     def __init__(self, url):
-        u = urlparse.urlparse(url)
+        u = urlparse(url)
         self.s = socket.create_connection((u.hostname, u.port), timeout=1)
 
     def request(self, method, url, headers={}, body=None, timeout=1, http="1.1"):
         headers = CaseInsensitiveDict(headers)
         if method == 'POST':
             body = (body or '').encode('utf-8')
-        u = urlparse.urlparse(url)
+        u = urlparse(url)
         headers['Host'] = u.hostname + ':' + str(u.port) if u.port else u.hostname
         if body is not None:
             headers['Content-Length'] = str(len(body))
@@ -194,7 +195,7 @@ class RawHttpConnection(object):
             req.append( "%s: %s" % (k, v) )
         req.append('')
         req.append('')
-        self.send('\r\n'.join(req))
+        self.send('\r\n'.join(req).encode('utf-8'))
 
         if body:
             self.send(body)
@@ -228,7 +229,7 @@ class RawHttpConnection(object):
                 raise Exception('Socket closed!')
             size -= len(c)
             data.append( c )
-        return ''.join(data)
+        return b''.join(data).decode('utf-8')
 
     def read_till_eof(self):
         data = []
@@ -237,7 +238,7 @@ class RawHttpConnection(object):
             if not c:
                 break
             data.append( c )
-        return ''.join(data)
+        return b''.join(data).decode('utf-8')
 
     def closed(self):
         # To check if socket is being closed, we need to recv and see
@@ -251,6 +252,7 @@ class RawHttpConnection(object):
         return r
 
     def read_chunk(self):
+        print('starting read chunk')
         line = recvline(self.s).rstrip('\r\n')
         bytes = int(line, 16) + 2 # Additional \r\n
         return self.read(bytes)[:-2]

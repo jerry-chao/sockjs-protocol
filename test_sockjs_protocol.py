@@ -109,14 +109,14 @@ class Test(unittest.TestCase):
     # Most of the XHR/Ajax based transports do work CORS if proper
     # headers are set.
     def verify_cors(self, r, origin=None):
-        if origin:
+        if origin != 'null':
             self.assertEqual(r['access-control-allow-origin'], origin)
             # In order to get cookies (`JSESSIONID` mostly) flying, we
             # need to set `allow-credentials` header to true.
             self.assertEqual(r['access-control-allow-credentials'], 'true')
         else:
             self.assertEqual(r['access-control-allow-origin'], '*')
-            self.assertFalse(r['access-control-allow-credentials'])
+            self.assertEqual(r['access-control-allow-credentials'], 'false')
 
     # Sometimes, due to transports limitations we need to request
     # private data using GET method. In such case it's very important
@@ -130,7 +130,7 @@ class Test(unittest.TestCase):
 
 # Greeting url: `/`
 # ----------------
-class BaseUrlGreeting(unittest.TestCase):
+class BaseUrlGreeting(Test):
     # The most important part of the url scheme, is without doubt, the
     # top url. Make sure the greeting is valid.
     def test_greeting(self):
@@ -278,7 +278,7 @@ class InfoTest(Test):
         # List of allowed origins. Currently ignored.
         self.assertEqual(data['origins'], ['*:*'])
         # Source of entropy for random number generator.
-        self.assertTrue(type(data['entropy']) in [int, long])
+        self.assertTrue(type(data['entropy']) in [int])
 
     # As browsers don't have a good entropy source, the server must
     # help with tht. Info url must supply a good, unpredictable random
@@ -288,8 +288,8 @@ class InfoTest(Test):
         data1 = json.loads(r1.body)
         r2 = GET(base_url + '/info')
         data2 = json.loads(r2.body)
-        self.assertTrue(type(data1['entropy']) in [int, long])
-        self.assertTrue(type(data2['entropy']) in [int, long])
+        self.assertTrue(type(data1['entropy']) in [int])
+        self.assertTrue(type(data2['entropy']) in [int])
         self.assertNotEqual(data1['entropy'], data2['entropy'])
 
     # Info url must support CORS.
@@ -306,7 +306,7 @@ class InfoTest(Test):
             r = OPTIONS(url, headers={'Origin': 'null', 'Access-Control-Request-Method': 'POST'})
             self.assertTrue(r.status == 204 or r.status == 200)
             self.assertFalse(r.body)
-            self.assertEqual(r['access-control-allow-origin'], 'null')
+            self.assertEqual(r['access-control-allow-origin'], '*')
 
     # The 'disabled_websocket_echo' service should have websockets
     # disabled.

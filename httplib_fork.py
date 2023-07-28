@@ -69,19 +69,10 @@ Req-sent-unread-response       _CS_REQ_SENT       <response_class>
 from array import array
 import os
 import socket
-from sys import py3kwarning
-from urlparse import urlsplit
+from urllib.parse import urlparse
 import warnings
-with warnings.catch_warnings():
-    if py3kwarning:
-        warnings.filterwarnings("ignore", ".*mimetools has been removed",
-                                DeprecationWarning)
-    import mimetools
-
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+import email.message
+from io import StringIO
 
 __all__ = ["HTTP", "HTTPResponse", "HTTPConnection",
            "HTTPException", "NotConnected", "UnknownProtocol",
@@ -215,7 +206,7 @@ MAXAMOUNT = 1048576
 # maximal line length when calling readline().
 _MAXLINE = 65536
 
-class HTTPMessage(mimetools.Message):
+class HTTPMessage(email.message.EmailMessage):
 
     def addheader(self, key, value):
         """Add header for field key handling repeats."""
@@ -364,7 +355,7 @@ class HTTPResponse:
         # Initialize with Simple-Response defaults
         line = self.fp.readline()
         if self.debuglevel > 0:
-            print "reply:", repr(line)
+            print("reply:", repr(line))
         if not line:
             # Presumably, the server closed the connection before
             # sending a valid response.
@@ -416,7 +407,7 @@ class HTTPResponse:
                 if not skip:
                     break
                 if self.debuglevel > 0:
-                    print "header:", skip
+                    print("header:", skip)
 
         self.status = status
         self.reason = reason.strip()
@@ -439,7 +430,7 @@ class HTTPResponse:
         self.msg = HTTPMessage(self.fp, 0)
         if self.debuglevel > 0:
             for hdr in self.msg.headers:
-                print "header:", hdr,
+                print("header:", hdr)
 
         # don't let the msg keep an fp
         self.msg.fp = None
@@ -776,16 +767,16 @@ class HTTPConnection:
                 raise NotConnected()
 
         if self.debuglevel > 0:
-            print "send:", repr(data)
+            print("send:", repr(data))
         blocksize = 8192
         if hasattr(data,'read') and not isinstance(data, array):
-            if self.debuglevel > 0: print "sendIng a read()able"
+            if self.debuglevel > 0: print("sendIng a read()able")
             datablock = data.read(blocksize)
             while datablock:
                 self.sock.sendall(datablock)
                 datablock = data.read(blocksize)
         else:
-            self.sock.sendall(data)
+            self.sock.sendall(data.encode('utf-8'))
 
     def _output(self, s):
         """Add a line of output to the current request buffer.
@@ -881,7 +872,7 @@ class HTTPConnection:
 
                 netloc = ''
                 if url.startswith('http'):
-                    nil, netloc, nil, nil, nil = urlsplit(url)
+                    nil, netloc, nil, nil, nil = urlparse.urlsplit(url)
 
                 if netloc:
                     try:
@@ -890,10 +881,7 @@ class HTTPConnection:
                         netloc_enc = netloc.encode("idna")
                     self.putheader('Host', netloc_enc)
                 else:
-                    try:
-                        host_enc = self.host.encode("ascii")
-                    except UnicodeEncodeError:
-                        host_enc = self.host.encode("idna")
+                    host_enc = self.host
                     # Wrap the IPv6 Host Header with [] (RFC 2732)
                     if host_enc.find(':') >= 0:
                         host_enc = "[" + host_enc + "]"
@@ -960,14 +948,14 @@ class HTTPConnection:
         thelen = None
         try:
             thelen = str(len(body))
-        except TypeError, te:
+        except TypeError:
             # If this is a file-like object, try to
             # fstat its file descriptor
             try:
                 thelen = str(os.fstat(body.fileno()).st_size)
             except (AttributeError, OSError):
                 # Don't send a length if this failed
-                if self.debuglevel > 0: print "Cannot stat!!"
+                if self.debuglevel > 0: print("Cannot stat!!")
 
         if thelen is not None:
             self.putheader('Content-Length', thelen)
@@ -985,7 +973,7 @@ class HTTPConnection:
 
         if body and ('content-length' not in header_names):
             self._set_content_length(body)
-        for hdr, value in headers.iteritems():
+        for hdr, value in headers.items():
             self.putheader(hdr, value)
         self.endheaders(body)
 
@@ -1102,7 +1090,7 @@ class HTTP:
                 #only add this keyword if non-default for compatibility
                 #with other connection classes
                 response = self._conn.getresponse(buffering)
-        except BadStatusLine, e:
+        except BadStatusLine as e:
             ### hmm. if getresponse() ever closes the socket on a bad request,
             ### then we are going to have problems with self.sock
 
